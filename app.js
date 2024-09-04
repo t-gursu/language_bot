@@ -3,11 +3,9 @@ const Groq = require("groq-sdk");
 const { Bot, InlineKeyboard  } = require("grammy");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const bot = new Bot(
-    process.env.TELEGRAM_BOT_TOKEN,
-);
+const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
-let systemPrompt = "";
+let userLanguageSettings = {};
 
 bot.command('start', async (ctx) => {
     const keyboard = new InlineKeyboard()
@@ -30,17 +28,18 @@ bot.command('change', async (ctx) => {
 });
 
 bot.callbackQuery('lang_en', async (ctx) => {
-    await ctx.editMessageText('You have chosen the practice English.');
-    systemPrompt = process.env.EN_PROMPT;
+    await ctx.editMessageText('You have chosen to practice English.');
+    userLanguageSettings[ctx.from.id] = process.env.EN_PROMPT;
 });
 
 bot.callbackQuery('lang_de', async (ctx) => {
     await ctx.editMessageText('Sie haben sich für die Praxis Deutsch entschieden.');
-    systemPrompt = process.env.DE_PROMPT;
+    userLanguageSettings[ctx.from.id] = process.env.DE_PROMPT;
 });
 
-async function getGroqResponse(query) {
-
+async function getGroqResponse(query, userId) {
+    const systemPrompt = userLanguageSettings[userId] || process.env.EN_PROMPT; // Varsayılan dil olarak İngilizce
+    
     try {
         const completion = await groq.chat.completions.create({
             "messages": [
@@ -78,8 +77,7 @@ async function getGroqResponse(query) {
 }
 
 bot.on("message:text", async (ctx) => {
-    const response = await getGroqResponse(ctx.message.text);
-
+    const response = await getGroqResponse(ctx.message.text, ctx.from.id);
     ctx.reply(response);
 });
 
